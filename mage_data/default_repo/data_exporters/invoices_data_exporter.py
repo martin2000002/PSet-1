@@ -144,6 +144,14 @@ def export_data_to_postgres(df, *args, **kwargs):
             if source_updated:
                 try:
                     source_updated_ts = date_parser.parse(source_updated)
+                    window_start_str = row['extract_window_start_utc']
+                    window_start_dt = date_parser.parse(window_start_str) if isinstance(window_start_str, str) else window_start_str
+                    if source_updated_ts.tzinfo is None:
+                        source_updated_ts = source_updated_ts.replace(tzinfo=timezone.utc)
+                    if window_start_dt.tzinfo is None:
+                        window_start_dt = window_start_dt.replace(tzinfo=timezone.utc)
+                    if source_updated_ts < window_start_dt or source_updated_ts >= window_end_dt:
+                        logger.warning(f"[TEMPORAL-ANOMALY] Registro {row['id']}: source_last_updated fuera de ventana")
                 except:
                     source_updated_ts = None
             
@@ -202,10 +210,6 @@ def export_data_to_postgres(df, *args, **kwargs):
         logger.info(f"[QUALITY] Registros en DataFrame: {len(df)}")
         logger.info(f"[QUALITY] Total registros en tabla (antes): {count_before}")
         logger.info(f"[QUALITY] Total registros en tabla (después): {count_after}")
-        logger.info(f"[METRICS-GRANULAR] Nuevas inserciones: {new_inserts}")
-        logger.info(f"[METRICS-GRANULAR] Actualizaciones (updates): {updates}")
-        logger.info(f"[METRICS-GRANULAR] Omitidos/errores: {omitted}")
-        logger.info(f"[IDEMPOTENCY] Upsert aplicado correctamente sobre PK 'id'.")
         
         if rows_with_temporal_issues > 0:
             logger.warning(f"[TEMPORAL-QUALITY] {rows_with_temporal_issues} registros con posibles "

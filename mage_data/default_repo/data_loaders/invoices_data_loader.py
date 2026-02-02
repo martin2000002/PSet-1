@@ -6,11 +6,11 @@ import pandas as pd
 from datetime import datetime, timedelta, timezone
 from dateutil import parser as date_parser
 
-CHUNK_DAYS = 1           # Tamaño del segmento (Requisito 7.1)
-PAGE_SIZE = 20           # Registros por petición (Requisito 7.2)
-MAX_RETRIES = 5          # Reintentos para Resiliencia
+CHUNK_DAYS = 1           # Tamaño del segmento
+PAGE_SIZE = 10           # Registros por petición
+MAX_RETRIES = 5          # Reintentos
 INITIAL_BACKOFF = 5      # Segundos base para Backoff
-COURTESY_WAIT = 0.5      # Pausa entre páginas (aumentado para QBO)
+COURTESY_WAIT = 0.5      # Pausa entre páginas
 CIRCUIT_BREAKER_THRESHOLD = 3  # Fallos consecutivos para activar circuit breaker
 
 QBO_URLS = {
@@ -47,7 +47,8 @@ def get_new_access_token(client_id, client_secret, refresh_token, logger):
     
     if new_refresh_token and new_refresh_token != refresh_token:
         logger.warning(f"[AUTH-ROTATION] NUEVO REFRESH TOKEN EMITIDO.")
-        logger.warning(f"[AUTH-ROTATION] Actualizar secret QBO_REFRESH_TOKEN!")
+        logger.warning(f"[AUTH-ROTATION] Actualizar secreto QBO_REFRESH_TOKEN en Mage Secrets.")
+        logger.info(f"[AUTH-ROTATION] Token rotado, nuevo token: {new_refresh_token}.")
     else:
         logger.info(f"[AUTH] Refresh Token sin cambios.")
     
@@ -58,6 +59,7 @@ def load_data_from_quickbooks(*args, **kwargs):
     logger = kwargs.get('logger')
     
     entity = 'Invoice'
+    logger.info(f"[CONFIG] Entidad a extraer: {entity}")
     start_date_str = kwargs.get('fecha_inicio')
     end_date_str = kwargs.get('fecha_fin')
     resume_from_str = kwargs.get('resume_from')
@@ -66,7 +68,11 @@ def load_data_from_quickbooks(*args, **kwargs):
         raise ValueError("[VALIDATION] Error: 'fecha_inicio' y 'fecha_fin' son obligatorios.")
 
     def parse_to_utc(date_str):
-        dt = date_parser.parse(date_str)
+        try:
+            dt = date_parser.parse(date_str)
+        except Exception as e:
+            raise ValueError(f"[VALIDATION] Error parseando fecha '{date_str}': {str(e)}. "
+                             f"Formato esperado: ISO 8601 (ej: 2024-01-01T00:00:00Z)")
 
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
@@ -86,10 +92,20 @@ def load_data_from_quickbooks(*args, **kwargs):
             dt_start = dt_resume
     
     client_id = get_secret_value('QBO_CLIENT_ID')
+    if not client_id:
+        raise ValueError("[SECURITY] QBO_CLIENT_ID no configurado en Mage Secrets")
     client_secret = get_secret_value('QBO_CLIENT_SECRET')
+    if not client_secret:
+        raise ValueError("[SECURITY] QBO_CLIENT_SECRET no configurado en Mage Secrets")
     refresh_token = get_secret_value('QBO_REFRESH_TOKEN')
+    if not refresh_token:
+        raise ValueError("[SECURITY] QBO_REFRESH_TOKEN no configurado en Mage Secrets")
     realm_id = get_secret_value('QBO_REALM_ID')
+    if not realm_id:
+        raise ValueError("[SECURITY] QBO_REALM_ID no configurado en Mage Secrets")
     qbo_environment = get_secret_value('QBO_ENVIRONMENT')
+    if not qbo_environment:
+        raise ValueError("[SECURITY] QBO_ENVIRONMENT no configurado en Mage Secrets")
     
     qbo_base_url = QBO_URLS.get(qbo_environment.lower(), QBO_URLS['sandbox'])
     logger.info(f"[CONFIG] Entorno QBO: {qbo_environment} | URL Base: {qbo_base_url}")
@@ -221,7 +237,6 @@ def load_data_from_quickbooks(*args, **kwargs):
                                f"Verificar si es esperado o hay problema de filtros/datos.")
             
             logger.info(f"[METRICS] Tramo Finalizado: "
-                        f"Ventana: [{chunk_start} - {chunk_end}] | "
                         f"Páginas: {pages_in_chunk} | "
                         f"Registros: {records_in_chunk} | "
                         f"Duración: {duration_chunk}s")

@@ -1,0 +1,1 @@
+{"id": "str", "payload": "dict", "ingested_at_utc": "datetime64[ns, UTC]", "extract_window_start_utc": "str", "extract_window_end_utc": "str", "page_number": "int64", "page_size": "int64", "request_payload": "str", "source_last_updated_utc": "str"}
