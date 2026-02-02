@@ -1,0 +1,2 @@
+{"operation": "create", "resource": {"type": "pipeline", "uuid": "qb_invoices_backfill"}, "timestamp": 1769920927, "user": 1}
+{"operation": "create", "resource": {"type": "pipeline", "uuid": "qb_invoices_backfill_copy"}, "timestamp": 1769980610, "user": 1}

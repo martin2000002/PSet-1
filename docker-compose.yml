@@ -1,0 +1,67 @@
+services:
+  # 1. Base de Datos (Capa RAW)
+  postgres:
+    image: postgres:15-alpine
+    container_name: qbo_postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=qbo_raw_db
+      - TZ=UTC
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d qbo_raw_db"]
+      interval: 1m
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - qbo_network
+
+  # 2. Visualizador de Base de Datos
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: qbo_pgadmin
+    restart: always
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+      - TZ=UTC
+    ports:
+      - "8085:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - qbo_network
+
+  # 3. Orquestador (Mage AI)
+  mage:
+    image: mageai/mageai:latest
+    container_name: qbo_mage
+    restart: always
+    environment:
+      - DEFAULT_OWNER_EMAIL=admin@admin.com
+      - DEFAULT_OWNER_PASSWORD=admin
+      - TZ=UTC
+    ports:
+      - "6789:6789"
+    volumes:
+      - ./mage_data:/home/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - qbo_network
+
+networks:
+  qbo_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  pgadmin_data:
